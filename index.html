@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>Libsigsegv by Distrotech</title>
+  </head>
+
+  <body>
+    <div id="container">
+      <div class="inner">
+
+        <header>
+          <h1>Libsigsegv</h1>
+          <h2>Mirror of git://git.savannah.gnu.org/libsigsegv.git</h2>
+        </header>
+
+        <section id="downloads" class="clearfix">
+          <a href="https://github.com/Distrotech/libsigsegv/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
+          <a href="https://github.com/Distrotech/libsigsegv/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
+          <a href="https://github.com/Distrotech/libsigsegv" id="view-on-github" class="button"><span>View on GitHub</span></a>
+        </section>
+
+        <hr>
+
+        <section id="main_content">
+          <pre><code>       GNU libsigsegv  -  Handling page faults in user mode
+</code></pre>
+
+<p>This is a library for handling page faults in user mode. A page fault
+occurs when a program tries to access to a region of memory that is
+currently not available. Catching and handling a page fault is a useful
+technique for implementing:</p>
+
+<ul>
+<li>pageable virtual memory,</li>
+<li>memory-mapped access to persistent databases,</li>
+<li>generational garbage collectors,</li>
+<li>stack overflow handlers,</li>
+<li>distributed shared memory,</li>
+<li>...</li>
+</ul><p>This library supports three sets of functions, all defined in :</p>
+
+<ul>
+<li><p>Global SIGSEGV handlers:
+sigsegv_install_handler, sigsegv_deinstall_handler.</p></li>
+<li><p>Local SIGSEGV handlers (a handler per memory area):
+sigsegv_init, sigsegv_register, sigsegv_unregister, sigsegv_dispatch.</p></li>
+<li><p>Stack overflow handlers:
+stackoverflow_install_handler, stackoverflow_deinstall_handler.</p></li>
+</ul><p>Each of the three APIs can be used independently or simultaneously.
+For examples of the use of the APIs, see:</p>
+
+<ul>
+<li>Global SIGSEGV handlers: see tests/sigsegv1.c.</li>
+<li>Local SIGSEGV handlers: see tests/sigsegv2.c.</li>
+<li>Stack overflow handlers: see tests/stackoverflow1.c.</li>
+</ul><p>About portability.</p>
+
+<p>Some platforms don't support this functionality. In , the
+preprocessor macro HAVE_SIGSEGV_RECOVERY will be defined if global and
+local SIGSEGV handlers are available, and the preprocessor macro
+HAVE_STACK_OVERFLOW_RECOVERY will be defined if stack overflow handlers
+are available. Note that the declared functions are available in all cases;
+on platforms where HAVE_SIGSEGV_RECOVERY or HAVE_STACK_OVERFLOW_RECOVERY is
+not defined, they will simply always return an error code or do nothing.</p>
+
+<p>The list of platforms where this library is known to work is contained in
+the file PORTING.</p>
+
+<p>About pageable virtual memory.</p>
+
+<p>Pageable virtual memory is usually done in the operating system's kernel.
+This library helps in implementing the others.</p>
+
+<p>Installing a page fault handler is usually more efficient than doing
+access checks in software at every access, because it's effectively the
+hardware (the MMU) which checks whether a page is present or not.</p>
+
+<p>Note that if you use system calls (like read()) to write into write-
+protected pages, the system will react by returning -1 and setting
+errno to EFAULT, instead of signalling SIGSEGV and restarting the system
+call. In this case, the program has to do what the SIGSEGV handler would
+do, and then restart the read() operation. Some buggy systems (SunOS 4)
+go into an endless loop on this occasion; on these systems you have to
+make sure that an area is writable <em>before</em> you call read() on it,</p>
+
+<p>About stack overflow handlers.</p>
+
+<p>In some applications, the stack overflow handler performs some cleanup or
+notifies the user and then immediately terminates the application.  In
+other applications, the stack overflow handler longjmps back to a central
+point in the application.  This library supports both uses.  In the second
+case, the handler must ensure to restore the normal signal mask (because
+many signals are blocked while the handler is executed), and must also
+call sigsegv_leave_handler() to transfer control; then only it can longjmp
+away.</p>
+
+<p>Note that longjmping back to a central point in the application can leave
+the application in an inconsistent state, because
+  1) no cleanup is executed for call frames that are being unwound,
+  2) the code being executed while the stack overflow occurred might leave
+     data structures in an intermediate, inconsistent state.
+If you want to avoid the first problem, you need to restructure your
+application into three or more threads:</p>
+
+<ul>
+<li>a main thread, which creates the other threads,</li>
+<li>worker threads, which may cause stack overflows, and in which all
+cleanups are registered through the pthread_cleanup_push function,</li>
+<li>a handler thread, which contains the handler for stack overflow and
+other kinds of SIGSEGV. The handler will call pthread_cancel on the
+worker thread whose stack overflowed.
+You will need to use the function pthread_sigmask on all threads except
+the handler thread, in order to ensure that the SIGSEGV signal gets handled
+in the designated handler thread.
+If you want to avoid the second problem together with the first problem,
+you need to enclose code that manipulates data structures in a way that is
+not safe to be interrupted within calls to pthread_setcancelstate() or
+pthread_setcanceltype().
+If you want to avoid just the second problem, you need to manipulate all data
+structures in a way that is safe to be interrupted at any moment and also
+compile your program with the gcc flag -fnon-call-exceptions.</li>
+</ul><p>About shared libraries.</p>
+
+<p>This library builds as a static library by default.  This seems useful
+because of the small size of the library (4 KB).  Of course, you can build
+it as a shared library by specifying the configure option '--enable-shared'.</p>
+
+<h2>
+<a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>Installation instructions on Unix:</p>
+
+<pre><code>    ./configure [OPTIONS]
+    make
+    make check
+    make install
+</code></pre>
+
+<p>Installation instructions on Woe32:</p>
+
+<pre><code>    See README.woe32.
+</code></pre>
+
+<p>Using libsigsegv in your package:</p>
+
+<ul>
+<li>For the APIs, see the comments in the  file (generated from
+src/sigsegv.h.in).</li>
+<li>An autoconf macro for determining where libsigsegv is installed and how to
+link with it is part of GNU gnulib, see
+<a href="http://www.gnu.org/software/gnulib/MODULES.html#module=libsigsegv">http://www.gnu.org/software/gnulib/MODULES.html#module=libsigsegv</a>
+</li>
+</ul><h2>
+<a name="copyright-notice" class="anchor" href="#copyright-notice"><span class="octicon octicon-link"></span></a>Copyright notice</h2>
+
+<p>Copyright 1998-1999, 2002-2011  Bruno Haible <a href="mailto:bruno@clisp.org">bruno@clisp.org</a>
+Copyright 2002-2005, 2009  Paolo Bonzini <a href="mailto:bonzini@gnu.org">bonzini@gnu.org</a>
+Copyright 2008-2010  Eric Blake <a href="mailto:ebb9@byu.net">ebb9@byu.net</a></p>
+
+<p>This is free software distributed under the GNU General Public Licence v2
+described in the file COPYING or (at your option) any later version.
+There is ABSOLUTELY NO WARRANTY, explicit or implied, on this software.</p>
+
+<h2>
+<a name="download" class="anchor" href="#download"><span class="octicon octicon-link"></span></a>Download</h2>
+
+<pre><code>http://ftpmirror.gnu.org/libsigsegv/libsigsegv-2.10.tar.gz
+http://ftp.gnu.org/gnu/libsigsegv/libsigsegv-2.10.tar.gz
+ftp://ftp.gnu.org/pub/gnu/libsigsegv/libsigsegv-2.10.tar.gz
+</code></pre>
+
+<h2>
+<a name="homepage" class="anchor" href="#homepage"><span class="octicon octicon-link"></span></a>Homepage</h2>
+
+<pre><code>http://www.gnu.org/software/libsigsegv/
+http://libsigsegv.sourceforge.net/ (old)
+http://savannah.gnu.org/projects/libsigsegv
+</code></pre>
+
+<h2>
+<a name="bug-reports-to" class="anchor" href="#bug-reports-to"><span class="octicon octicon-link"></span></a>Bug reports to</h2>
+
+<pre><code>&lt;bug-libsigsegv@gnu.org&gt;
+</code></pre>
+        </section>
+
+        <footer>
+          Libsigsegv is maintained by <a href="https://github.com/Distrotech">Distrotech</a><br>
+          This page was generated by <a href="http://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="http://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
+
+        
+      </div>
+    </div>
+  </body>
+</html>
