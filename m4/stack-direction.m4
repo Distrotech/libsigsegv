@@ -15,7 +15,7 @@ AC_DEFUN([SV_STACK_DIRECTION],
       a29k | \
       alpha* | \
       arc | \
-      arm* | strongarm* | xscale* | \
+      arm* | strongarm* | xscale* | aarch64 | \
       avr | \
       c1 | c2 | c32 | c34 | c38 | \
       clipper | \
